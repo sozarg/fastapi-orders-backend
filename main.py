@@ -1,10 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from xata.client import XataClient
 from datetime import datetime
+import os
 
+# Inicializar la aplicación FastAPI
 app = FastAPI()
 
-# Modelos para validar datos
+# Configurar el cliente de Xata con variables de entorno
+xata = XataClient(
+    api_key=os.getenv("XATA_API_KEY"),
+    db_url=os.getenv("XATA_DATABASE_URL")
+)
+
+# Modelos para validar datos de entrada
 class OrderCreate(BaseModel):
     user_id: str
     product: str
@@ -14,42 +23,56 @@ class MessageCreate(BaseModel):
     user_id: str
     content: str
 
-# Simulación de base de datos (reemplaza con Xata más adelante)
-orders = []
-messages = []
+class OrderUpdate(BaseModel):
+    status: str
 
+# Endpoint raíz para verificar que el servidor funciona
 @app.get("/")
 @app.head("/")
 async def read_root():
     return {"message": "Hola, Detta3D"}
 
-@app.post("/orders/")
+# Crear un nuevo pedido
+@app.post("/orders/", response_model=dict)
 async def create_order(order: OrderCreate):
     new_order = {
-        "id": str(len(orders) + 1),
         "user_id": order.user_id,
         "product": order.product,
         "status": "pending",
         "created_at": datetime.utcnow().isoformat()
     }
-    orders.append(new_order)
-    return new_order
+    resp = xata.records().insert("orders", new_order)
+    if resp.is_success():
+        return resp["record"]
+    raise HTTPException(status_code=500, detail="Failed to create order")
 
-@app.get("/orders/{order_id}")
+# Obtener detalles de un pedido por ID
+@app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):
-    for order in orders:
-        if order["id"] == order_id:
-            return order
+    resp = xata.records().get("orders", order_id)
+    if resp.is_success():
+        return resp["record"]
     raise HTTPException(status_code=404, detail="Order not found")
 
-@app.post("/messages/")
+# Actualizar el estado de un pedido
+@app.patch("/orders/{order_id}", response_model=dict)
+async def update_order(order_id: str, order_update: OrderUpdate):
+    update_data = {"status": order_update.status}
+    resp = xata.records().update("orders", order_id, update_data)
+    if resp.is_success():
+        return resp["record"]
+    raise HTTPException(status_code=404, detail="Order not found")
+
+# Crear un mensaje relacionado con un pedido
+@app.post("/messages/", response_model=dict)
 async def create_message(message: MessageCreate):
     new_message = {
-        "id": str(len(messages) + 1),
         "order_id": message.order_id,
         "user_id": message.user_id,
         "content": message.content,
         "created_at": datetime.utcnow().isoformat()
     }
-    messages.append(new_message)
-    return new_message
+    resp = xata.records().insert("messages", new_message)
+    if resp.is_success():
+        return resp["record"]
+    raise HTTPException(status_code=500, detail="Failed to create message")

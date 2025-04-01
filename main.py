@@ -26,7 +26,7 @@ class OrderUpdate(BaseModel):
 @app.get("/")
 @app.head("/")
 async def read_root():
-    return {"message": "Hola, Detta3D"}
+    return {"message": "Hola, Detta3D - API Key Fixed"}
 
 @app.post("/orders/", response_model=dict)
 async def create_order(order: OrderCreate):

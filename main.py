@@ -39,7 +39,9 @@ async def create_order(order: OrderCreate):
     resp = xata.records().insert("orders", new_order)
     if resp.is_success():
         return resp["record"]
-    raise HTTPException(status_code=500, detail="Failed to create order")
+    # Mostrar el mensaje de error de Xata para depurar
+    error_message = resp.get("message", "Failed to create order")
+    raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
 
 @app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):

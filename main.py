@@ -4,16 +4,13 @@ from xata.client import XataClient
 from datetime import datetime
 import os
 
-# Inicializar la aplicación FastAPI
 app = FastAPI()
 
-# Configurar el cliente de Xata con variables de entorno
 xata = XataClient(
     api_key=os.getenv("XATA_API_KEY"),
     db_url=os.getenv("XATA_DATABASE_URL")
 )
 
-# Modelos para validar datos de entrada
 class OrderCreate(BaseModel):
     user_id: str
     product: str
@@ -26,13 +23,11 @@ class MessageCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
-# Endpoint raíz para verificar que el servidor funciona
 @app.get("/")
 @app.head("/")
 async def read_root():
     return {"message": "Hola, Detta3D"}
 
-# Crear un nuevo pedido
 @app.post("/orders/", response_model=dict)
 async def create_order(order: OrderCreate):
     new_order = {
@@ -46,7 +41,6 @@ async def create_order(order: OrderCreate):
         return resp["record"]
     raise HTTPException(status_code=500, detail="Failed to create order")
 
-# Obtener detalles de un pedido por ID
 @app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):
     resp = xata.records().get("orders", order_id)
@@ -54,7 +48,6 @@ async def get_order(order_id: str):
         return resp["record"]
     raise HTTPException(status_code=404, detail="Order not found")
 
-# Actualizar el estado de un pedido
 @app.patch("/orders/{order_id}", response_model=dict)
 async def update_order(order_id: str, order_update: OrderUpdate):
     update_data = {"status": order_update.status}
@@ -63,7 +56,6 @@ async def update_order(order_id: str, order_update: OrderUpdate):
         return resp["record"]
     raise HTTPException(status_code=404, detail="Order not found")
 
-# Crear un mensaje relacionado con un pedido
 @app.post("/messages/", response_model=dict)
 async def create_message(message: MessageCreate):
     new_message = {

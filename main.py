@@ -26,7 +26,7 @@ class OrderCreate(BaseModel):
 
 class MessageCreate(BaseModel):
     order_id: str
-    user_id: str
+    sender: str  # Cambiado de user_id a sender para coincidir con el esquema de Xata
     content: str
 
 class OrderUpdate(BaseModel):
@@ -48,7 +48,8 @@ async def create_order(order: OrderCreate):
         resp = xata.records().insert("orders", new_order)
         if resp.is_success():
             return resp["record"]
-        error_message = resp.get("message", "Failed to create order")
+        error_details = resp.get("errors", [{}])[0] if "errors" in resp else resp
+        error_message = error_details.get("message", "Unknown error")
         raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
@@ -72,7 +73,7 @@ async def update_order(order_id: str, order_update: OrderUpdate):
 async def create_message(message: MessageCreate):
     new_message = {
         "order_id": message.order_id,
-        "user_id": message.user_id,
+        "sender": message.sender,  # Cambiado de user_id a sender
         "content": message.content,
         "created_at": datetime.utcnow().isoformat()
     }
@@ -80,7 +81,8 @@ async def create_message(message: MessageCreate):
         resp = xata.records().insert("messages", new_message)
         if resp.is_success():
             return resp["record"]
-        error_message = resp.get("message", "Failed to create message")
+        error_details = resp.get("errors", [{}])[0] if "errors" in resp else resp
+        error_message = error_details.get("message", "Unknown error")
         raise HTTPException(status_code=500, detail=f"Failed to create message: {error_message}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")

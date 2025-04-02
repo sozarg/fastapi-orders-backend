@@ -17,7 +17,9 @@ app.add_middleware(
 
 xata = XataClient(
     api_key=os.getenv("XATA_API_KEY"),
-    db_url=os.getenv("XATA_DATABASE_URL")
+    workspace_id=os.getenv("XATA_WORKSPACE_ID"),
+    db_name=os.getenv("XATA_DB_NAME"),
+    branch_name=os.getenv("XATA_BRANCH", "main")
 )
 
 class OrderCreate(BaseModel):

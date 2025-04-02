@@ -3,8 +3,18 @@ from pydantic import BaseModel
 from xata.client import XataClient
 from datetime import datetime
 import os
+from fastapi.middleware.cors import CORSMiddleware  # Añade esta importación
 
 app = FastAPI()
+
+# Configura CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://react-orders-frontend.onrender.com"],  # URL de tu frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 xata = XataClient(
     api_key=os.getenv("XATA_API_KEY"),
@@ -39,7 +49,6 @@ async def create_order(order: OrderCreate):
     resp = xata.records().insert("orders", new_order)
     if resp.is_success():
         return resp["record"]
-    # Mostrar el mensaje de error de Xata para depurar
     error_message = resp.get("message", "Failed to create order")
     raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
 

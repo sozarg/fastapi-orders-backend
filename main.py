@@ -3,14 +3,13 @@ from pydantic import BaseModel
 from xata.client import XataClient
 from datetime import datetime
 import os
-from fastapi.middleware.cors import CORSMiddleware  # Añade esta importación
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Configura CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://react-orders-frontend.onrender.com"],  # URL de tu frontend
+    allow_origins=["https://react-orders-frontend.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,14 +42,16 @@ async def create_order(order: OrderCreate):
     new_order = {
         "user_id": order.user_id,
         "product": order.product,
-        "status": "pending",
-        "created_at": datetime.utcnow().isoformat()
+        "status": "pending"
     }
-    resp = xata.records().insert("orders", new_order)
-    if resp.is_success():
-        return resp["record"]
-    error_message = resp.get("message", "Failed to create order")
-    raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
+    try:
+        resp = xata.records().insert("orders", new_order)
+        if resp.is_success():
+            return resp["record"]
+        error_message = resp.get("message", "Failed to create order")
+        raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
 
 @app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):
@@ -75,7 +76,11 @@ async def create_message(message: MessageCreate):
         "content": message.content,
         "created_at": datetime.utcnow().isoformat()
     }
-    resp = xata.records().insert("messages", new_message)
-    if resp.is_success():
-        return resp["record"]
-    raise HTTPException(status_code=500, detail="Failed to create message")
+    try:
+        resp = xata.records().insert("messages", new_message)
+        if resp.is_success():
+            return resp["record"]
+        error_message = resp.get("message", "Failed to create message")
+        raise HTTPException(status_code=500, detail=f"Failed to create message: {error_message}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")

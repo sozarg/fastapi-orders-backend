@@ -41,6 +41,7 @@ class OrderCreate(BaseModel):
     user_id: str
     product: str
     price: float
+    payment_status: str
 
 class MessageCreate(BaseModel):
     order_id: str
@@ -61,6 +62,7 @@ async def create_order(order: OrderCreate):
         "user_id": order.user_id,
         "product": order.product,
         "price": order.price,
+        "payment_status": order.payment_status,
         "status": "pending"
     }
     try:

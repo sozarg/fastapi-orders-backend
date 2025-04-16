@@ -94,17 +94,14 @@ async def create_order(order: OrderCreate):
 
 @app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):
-    resp = xata.records().get("orders", order_id)
+    record = xata.records().get("orders", order_id)
+    print(record)
 
-    if resp.is_success():
-        #Verificamos si el contenido está en el campo 'record'
-        record = resp.get("record")
-        if record:
-            return record
-        else:
-            raise HTTPException(status_code=500, detail="Insert ok, pero no se devolvió el contenido del registro")
+    if record is not None:
+        return record
+    else:
+        raise HTTPException(status_code=404, detail="Order not found")
 
-    raise HTTPException(status_code=404, detail="Order not found")
 
 @app.patch("/orders/{order_id}", response_model=dict)
 async def update_order(order_id: str, order_update: OrderUpdate):

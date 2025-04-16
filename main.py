@@ -29,12 +29,14 @@ print("DB Name:", os.getenv("XATA_DB_NAME"))
 @app.get("/test-xata")
 async def test_xata():
     try:
-        resp = xata.table().list()
+        resp = xata.tables().list_tables()
         if resp.is_success():
             return {"message": "Conexión exitosa", "tables": resp["tables"]}
         return {"error": "Fallo al listar tablas", "details": resp}
     except Exception as e:
         return {"error": str(e)}
+
+
 class OrderCreate(BaseModel):
     user_id: str
     product: str

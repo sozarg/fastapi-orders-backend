@@ -124,4 +124,12 @@ async def create_message(message: MessageCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create message: {error_message}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
-        
+
+@app.get("/orders/", response_model=list[dict])
+async def get_all_orders():
+    try:
+        records = xata.records().get_all("orders")
+        return records
+    except Exception as e:
+        print("Error al obtener todos los pedidos:", e)
+        raise HTTPException(status_code=500, detail=f"Error al obtener pedidos: {str(e)}")

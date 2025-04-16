@@ -76,14 +76,13 @@ async def create_order(order: OrderCreate):
                 full_record = xata.records().get("orders", inserted_id)
                 print("Respuesta de get():", full_record)
 
-                if full_record.is_success() and "record" in full_record:
-                    return full_record["record"]
+                if full_record.is_success():
+                    return full_record  # <- este es el fix
                 else:
-                    raise HTTPException(status_code=500, detail="Insert ok, pero no se pudo recuperar el registro (o no contiene 'record')")
+                    raise HTTPException(status_code=500, detail="Insert ok, pero no se pudo recuperar el registro")
             else:
                 raise HTTPException(status_code=500, detail="Insert ok, pero no se devolvió el ID")
 
-        # Si insert falló
         print("Xata insert error response:", resp)
         error_details = resp.get("errors", [{}])[0]
         error_message = error_details.get("message", "Unknown error")

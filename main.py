@@ -65,14 +65,25 @@ async def create_order(order: OrderCreate):
         "payment_status": order.payment_status,
         "status": "pending"
     }
+
     try:
         resp = xata.records().insert("orders", new_order)
+
         if resp.is_success():
-            return resp["record"]
-        error_details = resp.get("errors", [{}])[0] if "errors" in resp else resp
+            if "record" in resp:
+                return resp["record"]
+            else:
+                raise HTTPException(status_code=500, detail="Insert succeeded but no record returned")
+
+        # Si no fue exitoso, mostramos qué pasó
+        print("Xata error response:", resp)
+
+        error_details = resp.get("errors", [{}])[0]
         error_message = error_details.get("message", "Unknown error")
         raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
+
     except Exception as e:
+        print("Error inesperado en /orders/:", e)
         raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
 
 @app.get("/orders/{order_id}", response_model=dict)

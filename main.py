@@ -20,7 +20,7 @@ xata = XataClient(
     workspace_id=os.getenv("XATA_WORKSPACE_ID"),
     db_name=os.getenv("XATA_DB_NAME"),
     branch_name=os.getenv("XATA_BRANCH", "main"),
-    region="us-west-2"
+    region=os.getenv("XATA_REGION", "us-west-2")
 )
 
 class OrderCreate(BaseModel):

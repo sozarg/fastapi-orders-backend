@@ -4,7 +4,6 @@ from xata.client import XataClient
 from datetime import datetime
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from xata.client.helpers import get_region_for_workspace
 
 app = FastAPI()
 
@@ -26,7 +25,6 @@ xata = XataClient(
 
 print("Workspace ID:", os.getenv("XATA_WORKSPACE_ID"))
 print("DB Name:", os.getenv("XATA_DB_NAME"))
-region = get_region_for_workspace(os.getenv("XATA_WORKSPACE_ID"))
 print("region: ",region)
 class OrderCreate(BaseModel):
     user_id: str

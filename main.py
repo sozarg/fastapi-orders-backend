@@ -19,7 +19,7 @@ xata = XataClient(
     api_key=os.getenv("XATA_API_KEY"),
     workspace_id=os.getenv("XATA_WORKSPACE_ID"),
     db_name=os.getenv("XATA_DB_NAME"),
-    branch_name=os.getenv("XATA_BRANCH", "main"),
+    branch_name=os.getenv("XATA_BRANCH"),
     region="us-west-2"
 )
 

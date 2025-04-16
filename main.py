@@ -25,7 +25,6 @@ xata = XataClient(
 
 print("Workspace ID:", os.getenv("XATA_WORKSPACE_ID"))
 print("DB Name:", os.getenv("XATA_DB_NAME"))
-print("region: ",region)
 class OrderCreate(BaseModel):
     user_id: str
     product: str

@@ -103,16 +103,23 @@ async def create_order(order: OrderCreate):
             detail=f"Error inesperado: {str(e)}"
         )
 
-@app.get("/orders/", response_model=List[dict])
+@app.get("/orders/", response_model=list[dict])
 async def get_all_orders():
     try:
-        records = xata.records().get_all("orders")
-        return records
+        response = xata.data().query("orders", {
+            "page": {
+                "size": 100  # Puedes ajustar este número según necesites
+            }
+        })
+        if not response.is_success():
+            raise HTTPException(
+                status_code=500,
+                detail="Error al obtener pedidos"
+            )
+        return response["records"]  # Xata devuelve los registros en la clave "records"
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al obtener los pedidos: {str(e)}"
-        )
+        print("Error al obtener todos los pedidos:", e)
+        raise HTTPException(status_code=500, detail=f"Error al obtener pedidos: {str(e)}")
 
 @app.get("/orders/{order_id}", response_model=dict)
 async def get_order(order_id: str):

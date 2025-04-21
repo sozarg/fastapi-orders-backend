@@ -1,20 +1,25 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from xata.client import XataClient
 from datetime import datetime
+from typing import Optional, List
 import os
-from fastapi.middleware.cors import CORSMiddleware
+from enum import Enum
 
-app = FastAPI()
+# Configuración de la aplicación
+app = FastAPI(title="Detta3D API", version="1.0.0")
 
+# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://react-orders-frontend.onrender.com"],
+    allow_origins=["https://react-orders-frontend.onrender.com", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Cliente Xata
 xata = XataClient(
     api_key=os.getenv("XATA_API_KEY"),
     workspace_id=os.getenv("XATA_WORKSPACE_ID"),
@@ -23,117 +28,167 @@ xata = XataClient(
     region=os.getenv("XATA_REGION", "us-west-2")
 )
 
-print("Workspace ID:", os.getenv("XATA_WORKSPACE_ID"))
-print("DB Name:", os.getenv("XATA_DB_NAME"))
+# Enums para validación
+class DeliveryMethod(str, Enum):
+    IN_PERSON = "Retira en persona"
+    DELIVERY = "Envío a domicilio"
+    POST_OFFICE = "Retiro en correo"
+    UNSURE = "No estoy seguro"
 
-@app.get("/test-xata")
-async def test_xata():
-    try:
-        resp = xata.data().query("orders", {"page": {"size": 1}})
-        if resp.is_success():
-            return {"message": "Conexión exitosa", "table_exists": "orders"}
-        return {"error": "Fallo al consultar tabla", "details": resp}
-    except Exception as e:
-        return {"error": str(e)}
+class PaymentMethod(str, Enum):
+    INSTAGRAM = "Instagram"
+    WHATSAPP = "Whatsapp"
+    MERCADOLIBRE = "Mercadolibre"
+    ONLINE_STORE = "Tienda online"
 
+# Modelos Pydantic
+class OrderBase(BaseModel):
+    user_id: str = Field(..., description="Nombre de la persona")
+    product: str = Field(..., description="Nombre del producto")
+    price: float = Field(..., gt=0, description="Precio del producto")
+    status: Optional[DeliveryMethod] = Field(None, description="Método de entrega")
+    payment_status: Optional[PaymentMethod] = Field(None, description="Medio de pago")
+    address: Optional[str] = Field(None, description="Dirección de entrega")
+    notes: Optional[str] = Field(None, description="Notas adicionales")
 
-class OrderCreate(BaseModel):
-    user_id: str
-    product: str
-    price: float
-    payment_status: str
-
-class MessageCreate(BaseModel):
-    order_id: str
-    sender: str  # Cambiado de user_id a sender para coincidir con el esquema de Xata
-    content: str
+class OrderCreate(OrderBase):
+    pass
 
 class OrderUpdate(BaseModel):
-    status: str
+    user_id: Optional[str] = None
+    product: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    status: Optional[DeliveryMethod] = None
+    payment_status: Optional[PaymentMethod] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
 
+# Endpoints
 @app.get("/")
-@app.head("/")
 async def read_root():
-    return {"message": "Hola, Detta3D - API Key Fixed"}
+    return {"message": "Detta3D API - v1.0.0"}
 
 @app.post("/orders/", response_model=dict)
 async def create_order(order: OrderCreate):
-    new_order = {
-        "user_id": order.user_id,
-        "product": order.product,
-        "price": order.price,
-        "payment_status": order.payment_status,
-        "status": "pending"
-    }
-
     try:
+        new_order = order.dict(exclude_none=True)
         resp = xata.records().insert("orders", new_order)
 
-        if resp.is_success():
-            inserted_id = resp.get("id")
-            if inserted_id:
-                # Traemos el registro por ID
-                full_record = xata.records().get("orders", inserted_id)
-                print("Respuesta de get():", full_record)
+        if not resp.is_success():
+            raise HTTPException(
+                status_code=500,
+                detail="Error al crear el pedido en la base de datos"
+            )
 
-                if full_record.is_success():
-                    return full_record  # <- este es el fix
-                else:
-                    raise HTTPException(status_code=500, detail="Insert ok, pero no se pudo recuperar el registro")
-            else:
-                raise HTTPException(status_code=500, detail="Insert ok, pero no se devolvió el ID")
+        inserted_id = resp.get("id")
+        if not inserted_id:
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo obtener el ID del pedido creado"
+            )
 
-        print("Xata insert error response:", resp)
-        error_details = resp.get("errors", [{}])[0]
-        error_message = error_details.get("message", "Unknown error")
-        raise HTTPException(status_code=500, detail=f"Failed to create order: {error_message}")
+        # Obtener el registro completo
+        full_record = xata.records().get("orders", inserted_id)
+        if not full_record.is_success():
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo recuperar el pedido creado"
+            )
+
+        return full_record
 
     except Exception as e:
-        print("Error inesperado en /orders/:", e)
-        raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado: {str(e)}"
+        )
 
-@app.get("/orders/{order_id}", response_model=dict)
-async def get_order(order_id: str):
-    record = xata.records().get("orders", order_id)
-    print(record)
-
-    if record is not None:
-        return record
-    else:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-
-@app.patch("/orders/{order_id}", response_model=dict)
-async def update_order(order_id: str, order_update: OrderUpdate):
-    update_data = {"status": order_update.status}
-    resp = xata.records().update("orders", order_id, update_data)
-    if resp.is_success():
-        return resp["record"]
-    raise HTTPException(status_code=404, detail="Order not found")
-
-@app.post("/messages/", response_model=dict)
-async def create_message(message: MessageCreate):
-    new_message = {
-        "order_id": message.order_id,
-        "sender": message.sender,  # Cambiado de user_id a sender
-        "content": message.content,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    try:
-        resp = xata.records().insert("messages", new_message)
-        if resp.is_success():
-            return resp["record"]
-        error_details = resp.get("errors", [{}])[0] if "errors" in resp else resp
-        error_message = error_details.get("message", "Unknown error")
-        raise HTTPException(status_code=500, detail=f"Failed to create message: {error_message}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
-
-@app.get("/orders/", response_model=list[dict])
+@app.get("/orders/", response_model=List[dict])
 async def get_all_orders():
     try:
         records = xata.records().get_all("orders")
         return records
     except Exception as e:
-        print("Error al obtener todos los pedidos:", e)
-        raise HTTPException(status_code=500, detail=f"Error al obtener pedidos: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener los pedidos: {str(e)}"
+        )
+
+@app.get("/orders/{order_id}", response_model=dict)
+async def get_order(order_id: str):
+    try:
+        record = xata.records().get("orders", order_id)
+        if not record.is_success():
+            raise HTTPException(
+                status_code=404,
+                detail="Pedido no encontrado"
+            )
+        return record
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el pedido: {str(e)}"
+        )
+
+@app.patch("/orders/{order_id}", response_model=dict)
+async def update_order(order_id: str, order_update: OrderUpdate):
+    try:
+        # Verificar si el pedido existe
+        existing_order = xata.records().get("orders", order_id)
+        if not existing_order.is_success():
+            raise HTTPException(
+                status_code=404,
+                detail="Pedido no encontrado"
+            )
+
+        # Actualizar solo los campos proporcionados
+        update_data = order_update.dict(exclude_none=True)
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No se proporcionaron datos para actualizar"
+            )
+
+        resp = xata.records().update("orders", order_id, update_data)
+        if not resp.is_success():
+            raise HTTPException(
+                status_code=500,
+                detail="Error al actualizar el pedido"
+            )
+
+        return resp["record"]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado: {str(e)}"
+        )
+
+@app.get("/orders/completed/", response_model=List[dict])
+async def get_completed_orders():
+    try:
+        # Aquí puedes definir tu criterio de "completado"
+        # Por ejemplo, pedidos con cierto status
+        completed_orders = xata.data().query(
+            "orders",
+            {
+                "filter": {
+                    "status": "completed"  # Ajusta según tu lógica de negocio
+                }
+            }
+        )
+        
+        if not completed_orders.is_success():
+            raise HTTPException(
+                status_code=500,
+                detail="Error al obtener los pedidos completados"
+            )
+            
+        return completed_orders["records"]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener los pedidos completados: {str(e)}"
+        )

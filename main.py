@@ -83,7 +83,7 @@ class OrderUpdate(BaseModel):
     notes: Optional[str] = None
 
 # Endpoints
-@app.route("/", methods=["GET", "HEAD"], summary="Verificar estado del backend")
+@app.get("/", , summary="Verificar estado del backend")
 async def root():
     """Devuelve un mensaje indicando que el backend está funcionando."""
     logger.info("Root endpoint accessed")
@@ -240,7 +240,7 @@ async def get_completed_orders():
                 detail="Error al obtener los pedidos completados"
             )
             
-        logger.info(f"Fetched {len(completed-orders['records'])} completed orders")
+        logger.info(f"Fetched {len(completed_orders['records'])} completed orders")
         return completed_orders["records"]
     except Exception as e:
         logger.error(f"Error fetching completed orders: {str(e)}")

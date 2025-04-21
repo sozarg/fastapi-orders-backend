@@ -83,7 +83,7 @@ class OrderUpdate(BaseModel):
     notes: Optional[str] = None
 
 # Endpoints
-@app.get("/", , summary="Verificar estado del backend")
+@app.get("/", summary="Verificar estado del backend")
 async def root():
     """Devuelve un mensaje indicando que el backend está funcionando."""
     logger.info("Root endpoint accessed")

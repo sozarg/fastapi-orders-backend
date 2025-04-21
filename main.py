@@ -83,7 +83,7 @@ class OrderUpdate(BaseModel):
     notes: Optional[str] = None
 
 # Endpoints
-@app.get("/", summary="Verificar estado del backend")
+@app.route("/", methods=["GET", "HEAD"], summary="Verificar estado del backend")
 async def root():
     """Devuelve un mensaje indicando que el backend está funcionando."""
     logger.info("Root endpoint accessed")
@@ -112,7 +112,6 @@ async def create_order(order: OrderCreate):
                 detail="No se pudo obtener el ID del pedido creado"
             )
 
-        # Obtener el registro completo
         full_record = xata.records().get("orders", inserted_id)
         if not full_record.is_success():
             logger.error(f"Failed to retrieve created order: {inserted_id}")
@@ -181,7 +180,6 @@ async def update_order(order_id: str, order_update: OrderUpdate):
     """Actualiza los campos especificados de un pedido existente."""
     logger.info(f"Updating order: {order_id}")
     try:
-        # Verificar si el pedido existe
         existing_order = xata.records().get("orders", order_id)
         if not existing_order.is_success():
             logger.warning(f"Order not found for update: {order_id}")
@@ -190,7 +188,6 @@ async def update_order(order_id: str, order_update: OrderUpdate):
                 detail="Pedido no encontrado"
             )
 
-        # Actualizar solo los campos proporcionados
         update_data = order_update.dict(exclude_none=True)
         if not update_data:
             logger.warning("No update data provided")
@@ -228,7 +225,7 @@ async def get_completed_orders():
             "orders",
             {
                 "filter": {
-                    "status": DeliveryMethod.DELIVERY.value  # Consideramos 'Envío a domicilio' como completado
+                    "status": DeliveryMethod.DELIVERY.value
                 },
                 "page": {
                     "size": 100
@@ -243,7 +240,7 @@ async def get_completed_orders():
                 detail="Error al obtener los pedidos completados"
             )
             
-        logger.info(f"Fetched {len(completed_orders['records'])} completed orders")
+        logger.info(f"Fetched {len(completed-orders['records'])} completed orders")
         return completed_orders["records"]
     except Exception as e:
         logger.error(f"Error fetching completed orders: {str(e)}")

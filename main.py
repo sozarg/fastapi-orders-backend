@@ -6,6 +6,17 @@ from datetime import datetime
 from typing import Optional, List
 import os
 from enum import Enum
+import logging
+
+# Configuración de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Validación de variables de entorno
+required_env_vars = ["XATA_API_KEY", "XATA_WORKSPACE_ID", "XATA_DB_NAME"]
+for var in required_env_vars:
+    if not os.getenv(var):
+        raise Exception(f"Missing environment variable: {var}")
 
 # Configuración de la aplicación
 app = FastAPI(title="Detta3D API", version="1.0.0")
@@ -13,20 +24,27 @@ app = FastAPI(title="Detta3D API", version="1.0.0")
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://react-orders-frontend.onrender.com", "http://localhost:3000"],
+    allow_origins=[
+        "https://react-orders-frontend.onrender.com",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Cliente Xata
-xata = XataClient(
-    api_key=os.getenv("XATA_API_KEY"),
-    workspace_id=os.getenv("XATA_WORKSPACE_ID"),
-    db_name=os.getenv("XATA_DB_NAME"),
-    branch_name=os.getenv("XATA_BRANCH", "main"),
-    region=os.getenv("XATA_REGION", "us-west-2")
-)
+try:
+    xata = XataClient(
+        api_key=os.getenv("XATA_API_KEY"),
+        workspace_id=os.getenv("XATA_WORKSPACE_ID"),
+        db_name=os.getenv("XATA_DB_NAME"),
+        branch_name=os.getenv("XATA_BRANCH", "main"),
+        region=os.getenv("XATA_REGION", "us-west-2")
+    )
+except Exception as e:
+    logger.error(f"Failed to initialize Xata client: {str(e)}")
+    raise Exception(f"Failed to initialize Xata client: {str(e)}")
 
 # Enums para validación
 class DeliveryMethod(str, Enum):
@@ -50,6 +68,7 @@ class OrderBase(BaseModel):
     payment_status: Optional[PaymentMethod] = Field(None, description="Medio de pago")
     address: Optional[str] = Field(None, description="Dirección de entrega")
     notes: Optional[str] = Field(None, description="Notas adicionales")
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Fecha de creación")
 
 class OrderCreate(OrderBase):
     pass
@@ -64,17 +83,22 @@ class OrderUpdate(BaseModel):
     notes: Optional[str] = None
 
 # Endpoints
-@app.get("/")
-async def read_root():
+@app.get("/", summary="Verificar estado del backend")
+async def root():
+    """Devuelve un mensaje indicando que el backend está funcionando."""
+    logger.info("Root endpoint accessed")
     return {"message": "Detta3D API - v1.0.0"}
 
-@app.post("/orders/", response_model=dict)
+@app.post("/orders/", response_model=dict, summary="Crear un nuevo pedido")
 async def create_order(order: OrderCreate):
+    """Crea un nuevo pedido en la base de datos Xata."""
+    logger.info(f"Creating order: {order.dict()}")
     try:
         new_order = order.dict(exclude_none=True)
         resp = xata.records().insert("orders", new_order)
 
         if not resp.is_success():
+            logger.error(f"Failed to create order: {resp.get('message', 'Unknown error')}")
             raise HTTPException(
                 status_code=500,
                 detail="Error al crear el pedido en la base de datos"
@@ -82,6 +106,7 @@ async def create_order(order: OrderCreate):
 
         inserted_id = resp.get("id")
         if not inserted_id:
+            logger.error("No ID returned for created order")
             raise HTTPException(
                 status_code=500,
                 detail="No se pudo obtener el ID del pedido creado"
@@ -90,59 +115,76 @@ async def create_order(order: OrderCreate):
         # Obtener el registro completo
         full_record = xata.records().get("orders", inserted_id)
         if not full_record.is_success():
+            logger.error(f"Failed to retrieve created order: {inserted_id}")
             raise HTTPException(
                 status_code=500,
                 detail="No se pudo recuperar el pedido creado"
             )
 
+        logger.info(f"Order created successfully: {inserted_id}")
         return full_record
 
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Unexpected error creating order: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error inesperado: {str(e)}"
         )
 
-@app.get("/orders/", response_model=list[dict])
+@app.get("/orders/", response_model=List[dict], summary="Obtener todos los pedidos")
 async def get_all_orders():
+    """Devuelve una lista de todos los pedidos almacenados."""
+    logger.info("Fetching all orders")
     try:
         response = xata.data().query("orders", {
             "page": {
-                "size": 100  # Puedes ajustar este número según necesites
+                "size": 100
             }
         })
         if not response.is_success():
+            logger.error(f"Failed to fetch orders: {response.get('message', 'Unknown error')}")
             raise HTTPException(
                 status_code=500,
                 detail="Error al obtener pedidos"
             )
-        return response["records"]  # Xata devuelve los registros en la clave "records"
+        logger.info(f"Fetched {len(response['records'])} orders")
+        return response["records"]
     except Exception as e:
-        print("Error al obtener todos los pedidos:", e)
+        logger.error(f"Error fetching orders: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener pedidos: {str(e)}")
 
-@app.get("/orders/{order_id}", response_model=dict)
+@app.get("/orders/{order_id}", response_model=dict, summary="Obtener un pedido específico")
 async def get_order(order_id: str):
+    """Devuelve los detalles de un pedido por su ID."""
+    logger.info(f"Fetching order: {order_id}")
     try:
         record = xata.records().get("orders", order_id)
         if not record.is_success():
+            logger.warning(f"Order not found: {order_id}")
             raise HTTPException(
                 status_code=404,
                 detail="Pedido no encontrado"
             )
+        logger.info(f"Order fetched: {order_id}")
         return record
     except Exception as e:
+        logger.error(f"Error fetching order {order_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener el pedido: {str(e)}"
         )
 
-@app.patch("/orders/{order_id}", response_model=dict)
+@app.patch("/orders/{order_id}", response_model=dict, summary="Actualizar un pedido")
 async def update_order(order_id: str, order_update: OrderUpdate):
+    """Actualiza los campos especificados de un pedido existente."""
+    logger.info(f"Updating order: {order_id}")
     try:
         # Verificar si el pedido existe
         existing_order = xata.records().get("orders", order_id)
         if not existing_order.is_success():
+            logger.warning(f"Order not found for update: {order_id}")
             raise HTTPException(
                 status_code=404,
                 detail="Pedido no encontrado"
@@ -151,6 +193,7 @@ async def update_order(order_id: str, order_update: OrderUpdate):
         # Actualizar solo los campos proporcionados
         update_data = order_update.dict(exclude_none=True)
         if not update_data:
+            logger.warning("No update data provided")
             raise HTTPException(
                 status_code=400,
                 detail="No se proporcionaron datos para actualizar"
@@ -158,43 +201,52 @@ async def update_order(order_id: str, order_update: OrderUpdate):
 
         resp = xata.records().update("orders", order_id, update_data)
         if not resp.is_success():
+            logger.error(f"Failed to update order: {resp.get('message', 'Unknown error')}")
             raise HTTPException(
                 status_code=500,
                 detail="Error al actualizar el pedido"
             )
 
+        logger.info(f"Order updated: {order_id}")
         return resp["record"]
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Unexpected error updating order {order_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error inesperado: {str(e)}"
         )
 
-@app.get("/orders/completed/", response_model=List[dict])
+@app.get("/orders/completed/", response_model=List[dict], summary="Obtener pedidos completados")
 async def get_completed_orders():
+    """Devuelve una lista de pedidos con estado 'Envío a domicilio' (entregados)."""
+    logger.info("Fetching completed orders")
     try:
-        # Aquí puedes definir tu criterio de "completado"
-        # Por ejemplo, pedidos con cierto status
         completed_orders = xata.data().query(
             "orders",
             {
                 "filter": {
-                    "status": "completed"  # Ajusta según tu lógica de negocio
+                    "status": DeliveryMethod.DELIVERY.value  # Consideramos 'Envío a domicilio' como completado
+                },
+                "page": {
+                    "size": 100
                 }
             }
         )
         
         if not completed_orders.is_success():
+            logger.error(f"Failed to fetch completed orders: {completed_orders.get('message', 'Unknown error')}")
             raise HTTPException(
                 status_code=500,
                 detail="Error al obtener los pedidos completados"
             )
             
+        logger.info(f"Fetched {len(completed_orders['records'])} completed orders")
         return completed_orders["records"]
     except Exception as e:
+        logger.error(f"Error fetching completed orders: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener los pedidos completados: {str(e)}"

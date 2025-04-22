@@ -96,8 +96,10 @@ async def create_order(order: OrderCreate):
     try:
         new_order = order.model_dump(exclude_none=True)
 
-        # Serializar fecha
-        if "created_at" in new_order:
+        # Fallback si no viene 'created_at'
+        if "created_at" not in new_order:
+            new_order["created_at"] = datetime.utcnow().isoformat()
+        else:
             new_order["created_at"] = new_order["created_at"].isoformat()
 
         # Serializar enums

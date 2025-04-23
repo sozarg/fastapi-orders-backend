@@ -96,13 +96,13 @@ async def create_order(order: OrderCreate):
     try:
         new_order = order.model_dump(exclude_none=True)
 
-        # Fallback si no viene 'created_at'
+        # ✅ Arreglamos el formato de created_at para que sea RFC 3339
         if "created_at" not in new_order:
-            new_order["created_at"] = datetime.utcnow().isoformat()
+            new_order["created_at"] = datetime.utcnow().isoformat() + "Z"
         else:
-            new_order["created_at"] = new_order["created_at"].isoformat()
+            new_order["created_at"] = new_order["created_at"].isoformat() + "Z"
 
-        # Serializar enums
+        # Serializar enums a texto
         if isinstance(new_order.get("status"), Enum):
             new_order["status"] = new_order["status"].value
         if isinstance(new_order.get("payment_status"), Enum):

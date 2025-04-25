@@ -1,40 +1,61 @@
 from fastapi import APIRouter, HTTPException
 from models.order import OrderCreate, OrderUpdate
 from services.xata_service import XataService
-from typing import List
 
-router = APIRouter(
-    prefix="/orders",
-    tags=["Orders"]
-)
+router = APIRouter()
+xata_service = XataService()
 
-xata = XataService()
+@router.get("/", summary="Verificar estado del backend")
+async def root():
+    return {"message": "Detta3D API - v1.0.0"}
 
-@router.post("/", response_model=dict, summary="Crear un nuevo pedido")
+@router.post("/orders/", summary="Crear un nuevo pedido")
 async def create_order(order: OrderCreate):
-    new_order = order.model_dump(exclude_none=True)
-    new_order["created_at"] = new_order["created_at"].isoformat()
+    try:
+        result = xata_service.insert_order(order.model_dump(exclude_none=True))
+        if not result.is_success():
+            raise HTTPException(status_code=500, detail="Error al crear el pedido en la base de datos")
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
 
-    record = await xata.create_order(new_order)
-    if not record:
-        raise HTTPException(status_code=500, detail="Error al crear el pedido")
-    return record
+@router.get("/orders/", summary="Obtener todos los pedidos")
+async def get_all_orders():
+    try:
+        result = xata_service.get_all_orders()
+        if not result.is_success():
+            raise HTTPException(status_code=500, detail="Error al obtener pedidos")
+        return result["records"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
 
-@router.get("/", response_model=List[dict], summary="Obtener todos los pedidos")
-async def get_orders():
-    orders = await xata.get_all_orders()
-    return orders
-
-@router.get("/{order_id}", response_model=dict, summary="Obtener un pedido específico")
+@router.get("/orders/{order_id}", summary="Obtener un pedido específico")
 async def get_order(order_id: str):
-    order = await xata.get_order_by_id(order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    return order
+    try:
+        result = xata_service.get_order(order_id)
+        if not result.is_success():
+            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
 
-@router.patch("/{order_id}", response_model=dict, summary="Actualizar un pedido")
+@router.patch("/orders/{order_id}", summary="Actualizar un pedido")
 async def update_order(order_id: str, order_update: OrderUpdate):
-    updated_order = await xata.update_order(order_id, order_update.dict(exclude_none=True))
-    if not updated_order:
-        raise HTTPException(status_code=500, detail="Error al actualizar el pedido")
-    return updated_order
+    try:
+        update_data = order_update.model_dump(exclude_none=True)
+        result = xata_service.update_order(order_id, update_data)
+        if not result.is_success():
+            raise HTTPException(status_code=500, detail="Error al actualizar el pedido")
+        return result["record"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
+
+@router.get("/orders/completed/", summary="Obtener pedidos completados")
+async def get_completed_orders():
+    try:
+        result = xata_service.get_completed_orders()
+        if not result.is_success():
+            raise HTTPException(status_code=500, detail="Error al obtener pedidos completados")
+        return result["records"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")

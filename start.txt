@@ -1,5 +1,0 @@
-Backend: FastAPI en Render, con UptimeRobot para evitar suspensiones por inactividad.
-Base de datos: Xata para PostgreSQL, con 15 GB de almacenamiento y alta disponibilidad.
-Frontend: HTML + React, alojado como sitio estático en Render.
-Actualizaciones en tiempo real: Implementa sondeos cada 5 segundos desde el frontend al backend.
-Mensajería: Genera enlaces a WhatsApp o Instagram en el frontend para contactar clientes.

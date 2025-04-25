@@ -2,9 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import orders
 
-app = FastAPI(title="Detta3D API", version="1.0.0")
+app = FastAPI(
+    title="Detta3D Orders API",
+    version="1.0.0"
+)
 
-# Configuración de CORS
+# Configuración CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -16,10 +19,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir routers
+# Incluir rutas
 app.include_router(orders.router)
-
-
-@app.get("/", summary="Verificar estado del backend")
-async def root():
-    return {"message": "Detta3D API - v1.0.0"}

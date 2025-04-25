@@ -29,7 +29,9 @@ class XataService:
 
     def update_order(self, order_id: str, order_data: dict):
         response = self.client.records().update("orders", order_id, order_data)
-        return response
+        if not response.is_success():
+            return None
+        return response["record"]
 
     def get_completed_orders(self):
         response = self.client.data().query(

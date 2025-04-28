@@ -115,7 +115,7 @@ def get_completed_orders() -> List[dict]:
         completed = xata.data().query(
             "orders",
             {
-                "filter": {"status": {"$value": "Envío a domicilio"}},
+                "filter": {"status": {"$is": "Envío a domicilio"}},
                 "page": {"size": 100}
             }
         )

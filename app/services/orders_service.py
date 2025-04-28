@@ -94,7 +94,7 @@ def update_order(order_id: str, order_update: OrderUpdate) -> dict:
         if isinstance(update_data.get("payment_status"), Enum):
             update_data["payment_status"] = update_data["payment_status"].value
 
-        resp = xata.records().update("orders", order_id, update_data)
+        resp = xata.records().update("orders", order_id, update_data, options={"return": True})
 
         if not resp.is_success():
             logger.error(f"Failed to update order: {resp.get('message', 'Unknown error')}")

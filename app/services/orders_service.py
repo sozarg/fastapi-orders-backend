@@ -95,13 +95,20 @@ def update_order(order_id: str, order_update: OrderUpdate) -> dict:
             update_data["payment_status"] = update_data["payment_status"].value
 
         resp = xata.records().update("orders", order_id, update_data)
+
         if not resp.is_success():
             logger.error(f"Failed to update order: {resp.get('message', 'Unknown error')}")
             raise HTTPException(status_code=500, detail="Error al actualizar el pedido")
-        
+
         updated_record = resp.get("record")
+
+        if not updated_record:
+            logger.error(f"No record returned after updating order: {order_id}")
+            raise HTTPException(status_code=500, detail="No se pudo obtener el pedido actualizado")
+
         logger.info(f"Order updated: {order_id}")
         return updated_record
+
     except HTTPException:
         raise
     except Exception as e:
